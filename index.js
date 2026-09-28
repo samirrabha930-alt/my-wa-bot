@@ -1,32 +1,37 @@
-const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require('@whiskeysockets/baileys');
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        logger: require('pino')({ level: 'silent' })
     });
 
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
-            // Yahan apna WhatsApp number daalein (e.g., 919876543210)
-            const phoneNumber = "91XXXXXXXXXX"; 
+            // Number formatted properly
+            let phoneNumber = "918136004933";
+            phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
             
+            await delay(3000);
             const code = await sock.requestPairingCode(phoneNumber);
             console.log("=================================");
             console.log(`PAIRING CODE: ${code}`);
             console.log("=================================");
-        }, 5000);
+        }, 6000);
     }
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         
         if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log('Connection closed, reconnecting...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
@@ -45,3 +50,4 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
+                
