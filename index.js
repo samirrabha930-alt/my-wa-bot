@@ -2,7 +2,19 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const client = new Client({
-    authStrategy: new LocalAuth()
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ],
+    }
 });
 
 client.on('qr', (qr) => {
@@ -14,7 +26,6 @@ client.on('ready', () => {
 });
 
 client.on('message', async msg => {
-    // Har kisi ko auto-reply bhejne ke liye
     msg.reply('Please wait, hum jald hi aapko reply karenge.');
 });
 
