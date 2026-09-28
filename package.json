@@ -6,8 +6,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "whatsapp-web.js": "^1.23.0",
-    "puppeteer": "^21.5.0",
+    "@whiskeysockets/baileys": "^6.6.0",
     "qrcode-terminal": "^0.12.0"
   }
 }
