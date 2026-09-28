@@ -6,7 +6,7 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true
+        printQRInTerminal: false // Isko false karein
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -15,8 +15,9 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
-            console.log('--- WHATSAPP QR CODE ---');
-            qrcode.generate(qr, { small: true });
+            console.log('=== SCAN THIS QR CODE ===');
+            // small: true se QR code chhota aur clean banega
+            qrcode.generate(qr, { small: true }); 
         }
 
         if (connection === 'close') {
@@ -34,12 +35,9 @@ async function connectToWhatsApp() {
         const msg = m.messages[0];
         if (!msg.key.fromMe && m.type === 'notify') {
             const from = msg.key.remoteJid;
-            
-            // Auto-reply message
             await sock.sendMessage(from, { text: 'Please wait, hum jald hi aapko reply karenge.' });
         }
     });
 }
 
 connectToWhatsApp();
-        
