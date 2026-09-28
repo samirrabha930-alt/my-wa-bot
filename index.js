@@ -1,33 +1,45 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ],
-    }
-});
+async function connectToWhatsApp() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
-client.on('qr', (qr) => {
-    qrcode.generate(qr, { small: true });
-});
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true
+    });
 
-client.on('ready', () => {
-    console.log('WhatsApp Bot Ready Hai!');
-});
+    sock.ev.on('creds.update', saveCreds);
 
-client.on('message', async msg => {
-    msg.reply('Please wait, hum jald hi aapko reply karenge.');
-});
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        if (qr) {
+            console.log('--- WHATSAPP QR CODE ---');
+            qrcode.generate(qr, { small: true });
+        }
 
-client.initialize();
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+            console.log('Connection closed, reconnecting...', shouldReconnect);
+            if (shouldReconnect) {
+                connectToWhatsApp();
+            }
+        } else if (connection === 'open') {
+            console.log('WhatsApp Bot Ready Hai!');
+        }
+    });
+
+    sock.ev.on('messages.upsert', async m => {
+        const msg = m.messages[0];
+        if (!msg.key.fromMe && m.type === 'notify') {
+            const from = msg.key.remoteJid;
+            
+            // Auto-reply message
+            await sock.sendMessage(from, { text: 'Please wait, hum jald hi aapko reply karenge.' });
+        }
+    });
+}
+
+connectToWhatsApp();
+        
