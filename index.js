@@ -1,25 +1,30 @@
 const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false // Isko false karein
+        printQRInTerminal: false
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-            console.log('=== SCAN THIS QR CODE ===');
-            // small: true se QR code chhota aur clean banega
-            qrcode.generate(qr, { small: true }); 
-        }
+    // BINA QR CODE KE PAIRING CODE GENERATE KARNE KE LIYE:
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            // Yahan apna WhatsApp number daalein (Country code ke sath, e.g. +918136004933)
+            const phoneNumber = "+918136004933"; 
+            const code = await sock.requestPairingCode(phoneNumber);
+            console.log(`=================================`);
+            console.log(`AAPKA PAIRING CODE HAI: ${code}`);
+            console.log(`=================================`);
+        }, 3000);
+    }
 
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
             console.log('Connection closed, reconnecting...', shouldReconnect);
@@ -41,3 +46,4 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
+                
