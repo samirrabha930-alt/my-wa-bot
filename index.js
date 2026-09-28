@@ -5,16 +5,7 @@ const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
 
@@ -24,14 +15,13 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-    console.log('Bot 24/7 Server Par Active Hai!');
+    console.log('Bot 24/7 Active Ho Gaya Hai!');
 });
 
 client.on('message', async (msg) => {
     if (msg.body.toLowerCase() === 'ping') {
-        msg.reply('pong (24/7 Active Bot)');
+        msg.reply('pong');
     }
 });
 
 client.initialize();
-        
