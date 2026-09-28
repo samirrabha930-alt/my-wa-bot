@@ -19,12 +19,14 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
-    console.log('--- SCAN THIS QR CODE ---');
+    console.log('\n======================================');
+    console.log('--- SCAN THIS QR CODE BELOW ---');
+    console.log('======================================\n');
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
-    console.log('Bot 24/7 Active Ho Gaya Hai!');
+    console.log('✅ WhatsApp Bot 24/7 Active Ho Gaya!');
 });
 
 client.on('message', async (msg) => {
@@ -34,4 +36,3 @@ client.on('message', async (msg) => {
 });
 
 client.initialize();
-        
