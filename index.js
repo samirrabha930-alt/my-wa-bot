@@ -10,16 +10,16 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // BINA QR CODE KE PAIRING CODE GENERATE KARNE KE LIYE:
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
-            // Yahan apna WhatsApp number daalein (Country code ke sath, e.g. +918136004933)
-            const phoneNumber = "+918136004933"; 
+            // Yahan apna WhatsApp number daalein (e.g., 919876543210)
+            const phoneNumber = "91XXXXXXXXXX"; 
+            
             const code = await sock.requestPairingCode(phoneNumber);
-            console.log(`=================================`);
-            console.log(`AAPKA PAIRING CODE HAI: ${code}`);
-            console.log(`=================================`);
-        }, 3000);
+            console.log("=================================");
+            console.log(`PAIRING CODE: ${code}`);
+            console.log("=================================");
+        }, 5000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -27,12 +27,11 @@ async function connectToWhatsApp() {
         
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
-            console.log('Connection closed, reconnecting...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
-            console.log('WhatsApp Bot Ready Hai!');
+            console.log('WhatsApp Bot Active Ho Gaya Hai!');
         }
     });
 
@@ -46,4 +45,3 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
-                
