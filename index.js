@@ -5,9 +5,10 @@ const QRCode = require('qrcode');
 let qrCodeUrl = "";
 let isConnected = false;
 
-// Har user ke last reply time ko track karne ke liye Map
+// Cooldown tracking Map
 const repliedUsers = new Map();
 
+// Web server for Render
 const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     if (isConnected) {
@@ -45,7 +46,7 @@ async function connectToWhatsApp() {
 
         if (qr) {
             qrCodeUrl = await QRCode.toDataURL(qr);
-            console.log("New QR Code generated! Open service URL in browser.");
+            console.log("New QR Code generated!");
         }
 
         if (connection === 'close') {
@@ -67,24 +68,27 @@ async function connectToWhatsApp() {
             const msg = m.messages[0];
             if (!msg || !msg.message) return;
 
-            // 1. Apne khud ke bheje hue messages ignore karein
+            // 1. Khud ke bheje gaye messages ignore karein
             if (msg.key.fromMe) return;
 
-            const from = msg.key.remoteJid;
+            const rawJid = msg.key.remoteJid;
 
-            // 2. Group aur Broadcast messages ignore karein
-            if (from.endsWith('@g.us') || from.includes('broadcast')) return;
+            // 2. Groups aur Broadcast messages ignore karein
+            if (!rawJid || rawJid.endsWith('@g.us') || rawJid.includes('broadcast')) return;
+
+            // 3. User ID ko clean pure phone number/ID me convert karein (LID vs PN fix)
+            const userId = rawJid.split('@')[0].split(':')[0];
 
             const now = Date.now();
             const COOLDOWN_TIME = 10 * 60 * 1000; // Exact 10 Minutes (600,000 ms)
 
-            // 3. Cooldown logic check
-            if (repliedUsers.has(from)) {
-                const lastRepliedTime = repliedUsers.get(from);
+            // 4. Cooldown Check
+            if (repliedUsers.has(userId)) {
+                const lastRepliedTime = repliedUsers.get(userId);
                 const timePassed = now - lastRepliedTime;
 
                 if (timePassed < COOLDOWN_TIME) {
-                    console.log(`User ${from} sent a message, but cooldown is active. (${Math.round((COOLDOWN_TIME - timePassed)/1000)} seconds remaining)`);
+                    console.log(`[Cooldown Active] ${userId} - ${Math.round((COOLDOWN_TIME - timePassed)/1000)} seconds remaining`);
                     return;
                 }
             }
@@ -97,11 +101,11 @@ async function connectToWhatsApp() {
 ⏳ Agar abhi reply na mile, thoda wait kijiye.
 🙏 Thank you for contacting us!`;
 
-            await sock.sendMessage(from, { text: autoReplyMessage });
+            await sock.sendMessage(rawJid, { text: autoReplyMessage });
 
-            // Record updated last reply time
-            repliedUsers.set(from, now);
-            console.log(`Auto-reply sent to ${from}. Next reply allowed in 10 minutes.`);
+            // Update user reply timestamp
+            repliedUsers.set(userId, now);
+            console.log(`[SUCCESS] Reply sent to ${userId}. Next reply in 10 minutes.`);
 
         } catch (err) {
             console.log("Error in message upsert:", err);
