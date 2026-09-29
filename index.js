@@ -5,10 +5,9 @@ const QRCode = require('qrcode');
 let qrCodeUrl = "";
 let isConnected = false;
 
-// Auto-reply Cooldown map (Har user ka last reply time track karne ke liye)
+// Har user ke last reply time ko track karne ke liye Map
 const repliedUsers = new Map();
 
-// Web server for QR Code display
 const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     if (isConnected) {
@@ -64,44 +63,50 @@ async function connectToWhatsApp() {
     });
 
     sock.ev.on('messages.upsert', async m => {
-        const msg = m.messages[0];
+        try {
+            const msg = m.messages[0];
+            if (!msg || !msg.message) return;
 
-        if (!msg || !msg.message) return;
+            // 1. Apne khud ke bheje hue messages ignore karein
+            if (msg.key.fromMe) return;
 
-        // 1. Aapke khud ke bheje hue messages ignore karein
-        if (msg.key.fromMe) return;
+            const from = msg.key.remoteJid;
 
-        const from = msg.key.remoteJid;
+            // 2. Group aur Broadcast messages ignore karein
+            if (from.endsWith('@g.us') || from.includes('broadcast')) return;
 
-        // 2. Group aur Broadcast messages ignore karein
-        if (from.endsWith('@g.us') || from === 'status@broadcast') return;
+            const now = Date.now();
+            const COOLDOWN_TIME = 10 * 60 * 1000; // Exact 10 Minutes (600,000 ms)
 
-        // 3. Exact 10 Minutes Cooldown (10 * 60 * 1000 ms)
-        const now = Date.now();
-        const COOLDOWN_TIME = 10 * 60 * 1000; // 10 Minutes in milliseconds
+            // 3. Cooldown logic check
+            if (repliedUsers.has(from)) {
+                const lastRepliedTime = repliedUsers.get(from);
+                const timePassed = now - lastRepliedTime;
 
-        if (repliedUsers.has(from)) {
-            const lastRepliedTime = repliedUsers.get(from);
-            if (now - lastRepliedTime < COOLDOWN_TIME) {
-                // Agar last message ko 10 minute se kam hue hain, toh reply na karein
-                return;
+                if (timePassed < COOLDOWN_TIME) {
+                    console.log(`User ${from} sent a message, but cooldown is active. (${Math.round((COOLDOWN_TIME - timePassed)/1000)} seconds remaining)`);
+                    return;
+                }
             }
-        }
 
-        // Auto-reply message
-        const autoReplyMessage = 
+            // Auto-reply message
+            const autoReplyMessage = 
 `🤖 Hello! Main Boss ka personal bot hoon.
 📩 Aapka message mil gaya hai.
 👨‍💼 Mera Boss abhi online hai to woh aapko jaldi reply karega.
 ⏳ Agar abhi reply na mile, thoda wait kijiye.
 🙏 Thank you for contacting us!`;
 
-        await sock.sendMessage(from, { text: autoReplyMessage });
+            await sock.sendMessage(from, { text: autoReplyMessage });
 
-        // User ka timing record karein
-        repliedUsers.set(from, now);
+            // Record updated last reply time
+            repliedUsers.set(from, now);
+            console.log(`Auto-reply sent to ${from}. Next reply allowed in 10 minutes.`);
+
+        } catch (err) {
+            console.log("Error in message upsert:", err);
+        }
     });
 }
 
 connectToWhatsApp();
-            
