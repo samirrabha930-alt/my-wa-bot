@@ -66,7 +66,11 @@ async function connectToWhatsApp() {
         const msg = m.messages[0];
         if (!msg.key.fromMe && m.type === 'notify') {
             const from = msg.key.remoteJid;
-            await sock.sendMessage(from, { text: 'Please wait, hum jald hi aapko reply karenge.' });
+            await sock.sendMessage(from, { text: '🤖 Hello! Main Boss ka personal bot hoon.
+📩 Aapka message mil gaya hai.
+👨‍💼 Mera Boss abhi online hai to woh aapko jaldi reply karega.
+⏳ Agar abhi reply na mile, thoda wait kijiye.
+🙏 Thank you for contacting us!' });
         }
     });
 }
