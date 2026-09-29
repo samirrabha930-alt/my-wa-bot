@@ -42,7 +42,6 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
-            // Convert QR code to image URL for web display
             qrCodeUrl = await QRCode.toDataURL(qr);
             console.log("New QR Code generated! Open service URL in browser.");
         }
@@ -51,29 +50,34 @@ async function connectToWhatsApp() {
             isConnected = false;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed, reconnecting...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
             isConnected = true;
             qrCodeUrl = "";
-            console.log('WhatsApp Bot Active Ho Gaya Hai!');
+            console.log('WhatsApp Bot Active!');
         }
     });
 
     sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
-        if (!msg.key.fromMe && m.type === 'notify') {
+
+        // Group messages aur khud ke bheje hue messages ko ignore karne ke liye
+        if (!msg.key.fromMe && m.type === 'notify' && !msg.key.remoteJid.endsWith('@g.us')) {
             const from = msg.key.remoteJid;
-            await sock.sendMessage(from, { text: '🤖 Hello! Main Boss ka personal bot hoon.
+
+            // Aapka custom formatted message
+            const autoReplyMessage = 
+`🤖 Hello! Main Boss ka personal bot hoon.
 📩 Aapka message mil gaya hai.
 👨‍💼 Mera Boss abhi online hai to woh aapko jaldi reply karega.
 ⏳ Agar abhi reply na mile, thoda wait kijiye.
-🙏 Thank you for contacting us!' });
+🙏 Thank you for contacting us!`;
+
+            await sock.sendMessage(from, { text: autoReplyMessage });
         }
     });
 }
 
 connectToWhatsApp();
-                
