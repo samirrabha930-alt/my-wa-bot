@@ -1,64 +1,63 @@
-const { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, delay } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const http = require('http');
-const fs = require('fs');
+const QRCode = require('qrcode');
 
-// Render keep-alive server
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('WhatsApp Bot Running');
+let qrCodeUrl = "";
+let isConnected = false;
+
+// Web server for QR Code display
+const server = http.createServer(async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    if (isConnected) {
+        res.end('<h1 style="color:green;text-align:center;margin-top:20%;">WhatsApp Bot Connected & Active!</h1>');
+    } else if (qrCodeUrl) {
+        res.end(`
+            <div style="text-align:center;margin-top:10%;">
+                <h2>Scan WhatsApp QR Code</h2>
+                <img src="${qrCodeUrl}" style="width:300px;height:300px;border:2px solid #000;" />
+                <p>Open WhatsApp > Linked Devices > Link a Device > Scan this QR</p>
+            </div>
+        `);
+    } else {
+        res.end('<h2 style="text-align:center;margin-top:20%;">Generating QR Code... Please refresh in 5 seconds.</h2>');
+    }
 });
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 async function connectToWhatsApp() {
-    // Session reset if connection is not registered
-    const authFolder = 'auth_info_baileys';
-    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
         logger: require('pino')({ level: 'silent' }),
-        browser: Browsers.macOS('Chrome'),
-        markOnlineOnConnect: true
+        browser: Browsers.macOS('Desktop')
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    if (!sock.authState.creds.registered) {
-        setTimeout(async () => {
-            let phoneNumber = "918136004933";
-            phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
-            
-            try {
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log("=================================");
-                console.log(`NEW PAIRING CODE: ${code}`);
-                console.log("=================================");
-            } catch (err) {
-                console.log("Error requesting pairing code:", err);
-            }
-        }, 8000);
-    }
-
     sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-        
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            // Convert QR code to image URL for web display
+            qrCodeUrl = await QRCode.toDataURL(qr);
+            console.log("New QR Code generated! Open service URL in browser.");
+        }
+
         if (connection === 'close') {
+            isConnected = false;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            
-            if (statusCode === DisconnectReason.loggedOut) {
-                if (fs.existsSync(authFolder)) {
-                    fs.rmSync(authFolder, { recursive: true, force: true });
-                }
-            }
-            
             console.log('Connection closed, reconnecting...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
+            isConnected = true;
+            qrCodeUrl = "";
             console.log('WhatsApp Bot Active Ho Gaya Hai!');
         }
     });
@@ -73,4 +72,4 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
-               
+                
