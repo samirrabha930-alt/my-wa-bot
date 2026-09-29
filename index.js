@@ -1,4 +1,4 @@
-const { makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, delay } = require('@whiskeysockets/baileys');
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -6,14 +6,15 @@ async function connectToWhatsApp() {
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        logger: require('pino')({ level: 'silent' })
+        logger: require('pino')({ level: 'silent' }),
+        // Desktop Chrome browser identify karne ke liye:
+        browser: Browsers.ubuntu('Chrome')
     });
 
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
-            // Number formatted properly
             let phoneNumber = "918136004933";
             phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
             
@@ -22,7 +23,7 @@ async function connectToWhatsApp() {
             console.log("=================================");
             console.log(`PAIRING CODE: ${code}`);
             console.log("=================================");
-        }, 6000);
+        }, 5000);
     }
 
     sock.ev.on('connection.update', (update) => {
@@ -50,4 +51,3 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
-                
