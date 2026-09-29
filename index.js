@@ -1,15 +1,14 @@
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const http = require('http');
 const QRCode = require('qrcode');
-const axios = require('axios'); // For keeping server awake
 
 let qrCodeUrl = "";
 let isConnected = false;
 
-// Cooldown tracking Map (RAM me store hoga aur server awake rahega)
+// 10-Minute Cooldown Tracker Map
 const repliedUsers = new Map();
 
-// Web server for Render
+// Web server for QR Code display on Render
 const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     if (isConnected) {
@@ -20,6 +19,7 @@ const server = http.createServer(async (req, res) => {
                 <h2>Scan WhatsApp QR Code</h2>
                 <img src="${qrCodeUrl}" style="width:300px;height:300px;border:2px solid #000;" />
                 <p>Open WhatsApp > Linked Devices > Link a Device > Scan this QR</p>
+                <p><b>Note:</b> If scan fails, refresh page for fresh QR code.</p>
             </div>
         `);
     } else {
@@ -30,18 +30,12 @@ const server = http.createServer(async (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// ==========================================
-// RENDER SLEEP FIX: Keep server awake 24/7
-// ==========================================
-setInterval(async () => {
-    try {
-        // Replace with your Render URL
-        await axios.get('https://my-wa-bot-14.onrender.com'); 
-        console.log("Ping sent to keep server awake.");
-    } catch (err) {
-        console.log("Ping failed (server awake check).");
-    }
-}, 5 * 60 * 1000); // Har 5 minute me khud ko ping karega
+// Native Self-Ping to prevent Render Free Server from sleeping
+setInterval(() => {
+    http.get('http://localhost:' + PORT, () => {
+        console.log("Self-ping successful. Server awake!");
+    }).on('error', () => {});
+}, 4 * 60 * 1000); // Ping every 4 minutes
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -60,20 +54,21 @@ async function connectToWhatsApp() {
 
         if (qr) {
             qrCodeUrl = await QRCode.toDataURL(qr);
-            console.log("New QR Code generated!");
+            console.log("New QR Code generated successfully!");
         }
 
         if (connection === 'close') {
             isConnected = false;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log('Connection closed, reconnecting...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
             isConnected = true;
             qrCodeUrl = "";
-            console.log('WhatsApp Bot Active!');
+            console.log('WhatsApp Bot Active Ho Gaya!');
         }
     });
 
@@ -82,30 +77,28 @@ async function connectToWhatsApp() {
             const msg = m.messages[0];
             if (!msg || !msg.message) return;
 
-            // 1. Khud ke messages ignore karein
+            // 1. Own sent messages ignore
             if (msg.key.fromMe) return;
 
             const rawJid = msg.key.remoteJid;
 
-            // 2. Groups aur Broadcast messages ignore karein
+            // 2. Groups & Broadcast ignore
             if (!rawJid || rawJid.endsWith('@g.us') || rawJid.includes('broadcast')) return;
 
+            // Clean User ID to avoid LID vs PN issue
             const userId = rawJid.split('@')[0].split(':')[0];
             const now = Date.now();
-            const COOLDOWN_TIME = 10 * 60 * 1000; // 10 Minutes 
+            const COOLDOWN_TIME = 10 * 60 * 1000; // 10 Minutes in ms
 
-            // 3. Cooldown Check
+            // 3. Cooldown check
             if (repliedUsers.has(userId)) {
-                const lastRepliedTime = repliedUsers.get(userId);
-                const timePassed = now - lastRepliedTime;
-
-                if (timePassed < COOLDOWN_TIME) {
-                    console.log(`[Cooldown] Ignored message from ${userId}`);
-                    return; // 10 minute nahi hue, isliye reply nahi dega
+                const lastRepliedTime =RepliedUsers.get(userId);
+                if (now - lastRepliedTime < COOLDOWN_TIME) {
+                    return; // 10 min cooldown active
                 }
             }
 
-            // Auto-reply message
+            // Custom Message
             const autoReplyMessage = 
 `🤖 Hello! Main Boss ka personal bot hoon.
 📩 Aapka message mil gaya hai.
@@ -115,14 +108,14 @@ async function connectToWhatsApp() {
 
             await sock.sendMessage(rawJid, { text: autoReplyMessage });
 
-            // Timestamp save karein
+            // Store last sent timestamp
             repliedUsers.set(userId, now);
-            console.log(`[REPLY SENT] to ${userId}. Next valid reply in 10 minutes.`);
 
         } catch (err) {
-            console.log("Error in message upsert:", err);
+            console.log("Error handling message:", err);
         }
     });
 }
 
 connectToWhatsApp();
+                
