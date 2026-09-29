@@ -1,7 +1,8 @@
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, delay } = require('@whiskeysockets/baileys');
 const http = require('http');
+const fs = require('fs');
 
-// Render port keep-alive server
+// Render keep-alive server
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('WhatsApp Bot Running');
@@ -10,20 +11,21 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    // Session reset if connection is not registered
+    const authFolder = 'auth_info_baileys';
+    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
 
     const sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
         logger: require('pino')({ level: 'silent' }),
-        browser: Browsers.macOS('Desktop'),
-        syncFullHistory: false
+        browser: Browsers.macOS('Chrome'),
+        markOnlineOnConnect: true
     });
 
     sock.ev.on('creds.update', saveCreds);
 
     if (!sock.authState.creds.registered) {
-        // Generates clean pairing code after WebSocket initialization
         setTimeout(async () => {
             let phoneNumber = "918136004933";
             phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
@@ -31,20 +33,27 @@ async function connectToWhatsApp() {
             try {
                 const code = await sock.requestPairingCode(phoneNumber);
                 console.log("=================================");
-                console.log(`PAIRING CODE: ${code}`);
+                console.log(`NEW PAIRING CODE: ${code}`);
                 console.log("=================================");
             } catch (err) {
                 console.log("Error requesting pairing code:", err);
             }
-        }, 10000);
+        }, 8000);
     }
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            
+            if (statusCode === DisconnectReason.loggedOut) {
+                if (fs.existsSync(authFolder)) {
+                    fs.rmSync(authFolder, { recursive: true, force: true });
+                }
+            }
+            
             console.log('Connection closed, reconnecting...', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
@@ -64,3 +73,4 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
+               
